@@ -86,22 +86,22 @@ def get_case_nums(div):
 	case_nums = div.find_all('td', attrs={"data-th": "Case #"})
 
 	return case_nums
-    
+	
 
 #extract charge table
 
-def create_charge_table(div,soup):
+def create_charge_table(div,element):
 
 	detainee_ID = div.get('id').lstrip('mugshot')
+
+	tr = element.find_parent('tr')
+
 	data = {}
 
-	charges = soup.find_all('table', class_="collapse centered_table shadow responsive")
-	for trs in charges:
-		tds = trs.find_all('td')
-		for td in tds:
-			key = td.attrs['data-th'].lower().strip()
-			value = td.text.strip()
-			data[key] = value
+	for td in tr.find_all('td'):
+		key = td.attrs['data-th'].lower().strip()
+		value = td.text.strip()
+		data[key] = value
 
 	charge.create(
 		detainee_id= detainee_ID,
@@ -141,7 +141,7 @@ def main():
 		for element in case_nums:
 			case_num = element.text.lower().strip()
 			try:
-				create_charge_table(div, soup)
+				create_charge_table(div, element)
 				print('adding Case# %s' % case_num)
 			except DoesNotExist:
 				print('%s already exists' % case_num)

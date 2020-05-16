@@ -25,12 +25,7 @@ class detainee_info(peewee.Model):
 
 
 class charge(peewee.Model):
- 
-    detainee_id= peewee.ForeignKeyField(
-        detainee_info,
-        backref='charges',
-        column_name='detainee_id',
-    )
+    detainee_id= peewee.CharField()
     case_num = peewee.CharField()
     description = peewee.CharField()
     status = peewee.CharField()
