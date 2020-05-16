@@ -1,4 +1,4 @@
-# Guidline to get boone county jail detainee infomation
+# Guideline to get boone county jail detainee infomation
 
 
 Steps to running the web scraper:
