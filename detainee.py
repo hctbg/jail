@@ -11,259 +11,144 @@ from peewee import DoesNotExist
 from urllib.parse import parse_qs, urlparse
 
 
+requests_cache.install_cache(
+	'cache',
+	expire_after=timedelta(hours=24),
+	allowable_methods=('GET')
+)
+
+url = 'https://report.boonecountymo.org/mrcjava/servlet/RMS01_MP.R00040s?run=2&R001=&R002=&ID=3641&hover_redir=&width=950'
+
+r = requests.get(url, headers={'user-agent': "I'm good people!!!"})
+
+soup = BeautifulSoup(r.content, "lxml")
 
 
-r = requests.get(
-    'https://report.boonecountymo.org/mrcjava/servlet/RMS01_MP.R00040s?run=2&R001=&R002=&ID=3641&hover_redir=&width=950',
-    headers={'user-agent': "I'm good people!!!"})
-
-soup = BeautifulSoup(r.text, features = "lxml")
-
-tables = soup.find('div', id = 'content')
-
-
-td_all = tables.find_all('td', class_='two td_left') #td means all detail infos and element 
-
-#all division (each detainee with charge and info)
-
-def get_detail_table():
-
-    r = requests.get(
-    'https://report.boonecountymo.org/mrcjava/servlet/RMS01_MP.R00040s?run=2&R001=&R002=&ID=3641&hover_redir=&width=950',
-    headers={'user-agent': "I'm good people!!!"})
-
-    search_results = []
-
-    soup = BeautifulSoup(r.text, features = "lxml")
-
-    body = soup.find('div', id = 'content')
-    
-    for div in body:
-
-        divs = soup.find_all('div', class_= 'mugshotDiv')
-
-        search_results.append(divs)
-
-    return search_results
+divs = soup.find_all('div', class_='mugshotDiv')
+	
 
 
 #all IDs (keys)
 
-def extract_detainee_ids():
+def get_detainee_ids(div):
 
-    # r = requests.get(
-    # 'https://report.boonecountymo.org/mrcjava/servlet/RMS01_MP.R00040s?run=2&R001=&R002=&ID=3641&hover_redir=&width=950',
-    # headers={'user-agent': "I'm good people!!!"}
-    # )
+	detainee_ID = div.attrs['id'].lstrip('mugshot')
 
-    # soup = BeautifulSoup(r.text, features = "lxml")
+	return detainee_ID
 
-    # tables = soup.find('div', id = 'content')
-
-    url = soup.select("div#content > div",recursive=False)
-
-    detainee_ids = set()
-
-    for tag in url:
-        div_ID = tag.get('id')
-        detainee_id = div_ID.lstrip('mugshot')
-        detainee_ids.add(detainee_id)
-    
-    return detainee_ids
-
-#define a function that enable me to get the result once I type in the ID
-
-def get_detainee_detail(detainee_id):
-
-    url = 'https://www.mshp.dps.missouri.gov/HP68/AccidentDetailsAction'
-
-    div = soup.find('div', id = detainee_id)
-
-    return div.content
 
 #for all names
-def get_detainee_names(detainee_id):
+def get_detainee_names(div):
+	name = div.find('div', class_="inmateName").text.strip()
+	return name
 
-    soup =  BeautifulSoup(r.text, features = "lxml")
 
-    all_names = soup.find_all('div', class_="inmateName")
+#ecreate detainee info table
 
-    for name in all_names:
-        name = name.text.strip()
+def create_info_table(div):
+	detainee_ID = div.get('id').lstrip('mugshot')
+	detainee_name = div.find('div', class_="inmateName").text.strip()
+
+	info_table = div.find('table', class_="collapse centered_table shadow")
+	
+	trs = info_table.find_all('tr')
+	
+	#data is a dictionary
+	data = {'height': "N/A", 'weight': "N/A", 'sex': "N/A",
+			'eyes': "N/A", 'hair': "N/A", 'race': "N/A", 
+			'age': "N/A", 'city': "N/A", 'state': "N/A", }
+
+	for tr in trs:
+		tds = tr.find_all('td')
+		key = tds[0].text.lower().strip()
+		value = tds[1].text.strip()
+		data[key] = value
+	
+
+	detainee_info.create(
+		detainee_id = detainee_ID,
+		name = detainee_name,
+		height = data['height'],
+		weight = data['weight'],
+		sex = data['sex'],
+		eyes = data['eyes'],
+		hair = data['hair'],
+		race = data['race'],
+		age = data['age'],
+		city = data['city'],
+		state = data['state'],
+	)
+ 
+
+#case number 
+def get_case_nums(div):
+
+	case_nums = div.find_all('td', attrs={"data-th": "Case #"})
+
+	return case_nums
     
-    return name
-
-#for all detainee personal info table
-
-def get_info_tables(detainee_id):
-
-    soup = BeautifulSoup(info_table, features = "lxml")
-
-    tables = soup.find('div', id = 'content')
-
-    all_info_tables = tables.find_all('table', class_="collapse centered_table shadow")
-    
-    return all_info_tables
-
-
-#extract detainee info table
-
-def extract_detainee_info(detainee_name, info_table):
-    # name cells 
-    all_names = soup.find_all('div', class_="inmateName")
-    # for name in all_names:
-    #     name = 
-
-    #info cells 
-    all_info_tables = tables.find_all('table', class_="collapse centered_table shadow")
-
-    info_cells = all_info_tables.find_all('td',class_='two td_left')
-
-    #detainee_id cells 
-    url = soup.select("div#content > div",recursive=False)
-    
-    # for tag in url:
-    #     div_ID = tag.get('id')
-    #     detainee_id = div_ID.lstrip('mugshot')
-    i = int(0)
-
-    for ID, name in detainee_id, all_names:
-        print(ID)
-
-        detainee_info.create(
-            detainee_id  = ID,
-            name = names,
-            height = info_cells[i].text.strip(),
-            
-            # weight = info_cells[i++].text.strip(),
-        #     sex = info_cells[i++].text.strip(),
-        #     eyes = info_cells[i++].text.strip(),
-        #     hair = info_cells[i++].text.strip(),
-        #     race = info_cells[i++].text.strip(),
-        #     age = info_cells[i++].text.strip(),
-        #     city = info_cells[i++].text.strip(),
-        #     state = info_cells[i++].text.strip(),
-        )
-        i = i+1
-    print(detainee_info)
-
 
 #extract charge table
 
-def extract_charge_info(detainee_id, table):
+def create_charge_table(div,soup):
 
-    all_charge_info = tables.find_all('table', class_="collapse centered_table shadow responsive")
+	detainee_ID = div.get('id').lstrip('mugshot')
+	data = {}
 
-    for ct in all_charge_info:
+	charges = soup.find_all('table', class_="collapse centered_table shadow responsive")
+	for trs in charges:
+		tds = trs.find_all('td')
+		for td in tds:
+			key = td.attrs['data-th'].lower().strip()
+			value = td.text.strip()
+			data[key] = value
 
-        charge_table = ct.find_all('tr')
-
-        charge_cells = charge_table.find_all('td',class_='two td_left')
-
-    charge.create(
-        detainee_id = detainee_id,
-        case_num = charge_cells[0].text.strip(),
-        description = charge_cells[1].text.strip(),
-        status = charge_cells[2].text.strip(),
-        bail_amount = charge_cells[3].text.strip(),
-        bond_type = charge_cells[4].text.strip(),
-        court_date = charge_cells[5].text.strip(),
-        court_time = charge_cells[6].text.strip(),
-        jurisdiction = charge_cells[7].text.strip(),
-        )
-
+	charge.create(
+		detainee_id= detainee_ID,
+		case_num= data['case #'],
+		description= data['charge description'],
+		status= data['charge status'],
+		bail_amount= data['bail amount'],
+		bond_type= data['bond type'],
+		court_date= data['court date'],
+		court_time= data['court time'],
+		jurisdiction= data ['court of jurisdiction']
+		)
 
 
 
 def main():
-        url = soup.select("div#content > div",recursive=False)
+	print('executing scraper')
+	divs = soup.find_all('div', class_='mugshotDiv')
 
-        detainee_ids = []
+	for div in divs:
+		detainee_ID = get_detainee_ids(div)
+		name = get_detainee_names(div)
+		case_nums = get_case_nums(div)
 
-        for tag in url:
-            div_ID = tag.get('id')
-            detainee_id = div_ID.lstrip('mugshot')
-            detainee_ids.append(detainee_id)
-            all_names = soup.find_all('div', class_="inmateName")
-        # for name in all_names:
-        #     name = 
+		print('checking %s information' % name)
 
-        #info cells 
-        all_info_tables = tables.find_all('table', class_="collapse centered_table shadow")
+		try:
+			detainee_info.get(detainee_id=detainee_ID)
+		except DoesNotExist:
+			create_info_table(div)
+			print('adding %s info' % name)
+			print('done')
+		else:
+			print('%s already exists' % name)
 
-        # info_cells = all_info_tables.find_all('td',class_='two td_left')
+		print("checking %s charge_information" %name)
+		for element in case_nums:
+			case_num = element.text.lower().strip()
+			try:
+				create_charge_table(div, soup)
+				print('adding Case# %s' % case_num)
+			except DoesNotExist:
+				print('%s already exists' % case_num)
+		print("finished with detainee %s" % name)
+		sleep(1.5)
 
-        #detainee_id cells 
-        url = soup.select("div#content > div",recursive=False)
-        
-        # for tag in url:
-        #     div_ID = tag.get('id')
-        #     detainee_id = div_ID.lstrip('mugshot')
-        i = int(0)
-        print(detainee_ids)
-        print('----------------')
-        print(all_names)
-        for ID in detainee_ids:
-            print(ID)
+	print('HAHA!!Finally Ready To Go!!')
 
-            detainee_info.create(
-                detainee_id  = ID
-                # name = names,
-                # height = info_cells[i].text.strip(),
-                
-                # weight = info_cells[i++].text.strip(),
-            #     sex = info_cells[i++].text.strip(),
-            #     eyes = info_cells[i++].text.strip(),
-            #     hair = info_cells[i++].text.strip(),
-            #     race = info_cells[i++].text.strip(),
-            #     age = info_cells[i++].text.strip(),
-            #     city = info_cells[i++].text.strip(),
-            #     state = info_cells[i++].text.strip(),
-            )
-            i = i+1
-        print(detainee_info)
-
-    # for search_results in get_detail_table():
-    #     detainee_ids = extract_detainee_ids(detail_results)
-    #     all_info_tables = get_info_tables(detainee_id)
-
-
-        # for detainee_id in detainee_ids:
-        #     print('checking for %s' % detainee_id)
-
-    #         try:
-    #             detainee_info.get(detainee_id=detainee_id)
-
-
-    #         except DoesNotExist:
-    #             print('extracting data for %s' % detainee_id)
-                
-    #             divs = get_detail_table()
-    #             extract_detainee_info(all_names.text.strip(),all_info_tables.find_all('td',class_='two td_left'))
-    #             extract_charge_info(detainee_id, charge_table.find_all('td',class_='two td_left'))
-    #             print('done')
-    #             sleep(3)
-    #         else:
-    #             print('%s already exists' % incident_num)
-
-        # sleep(3)
-        # # TODO: don't sleep if prev request came from cache
-
-
-if __name__ == '__main__':
-    main()
-
-
-
-#for all charge details
-
-##table data in detail information e.g. 4ft5ich 
-
-# for td in all_detail_info:
-#     for td in td.find_all('td',class_='two td_left'):
-#         print(td.text.strip())
-#     print('---------------')
-
-
-
-
+if __name__=='__main__':
+	main()
